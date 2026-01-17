@@ -1,5 +1,9 @@
 package com.catanatron.core.map;
 
+import com.catanatron.core.map.tiles.Edge;
+import com.catanatron.core.map.tiles.LandTile;
+import com.catanatron.core.map.tiles.Tile;
+import com.catanatron.core.map.tiles.Water;
 import com.catanatron.core.model.Resource;
 import java.util.*;
 
@@ -50,34 +54,34 @@ public class CatanMap {
         if (neighbor instanceof LandTile lt) {
           switch (d) {
             case EAST -> {
-              nodes.put(NodeRef.NORTHEAST, lt.nodes.get(NodeRef.NORTHWEST));
-              nodes.put(NodeRef.SOUTHEAST, lt.nodes.get(NodeRef.SOUTHWEST));
-              edges.put(EdgeRef.EAST, lt.edges.get(EdgeRef.WEST));
+              nodes.put(NodeRef.NORTHEAST, lt.nodes().get(NodeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTHEAST, lt.nodes().get(NodeRef.SOUTHWEST));
+              edges.put(EdgeRef.EAST, lt.edges().get(EdgeRef.WEST));
             }
             case SOUTHEAST -> {
-              nodes.put(NodeRef.SOUTH, lt.nodes.get(NodeRef.NORTHWEST));
-              nodes.put(NodeRef.SOUTHEAST, lt.nodes.get(NodeRef.NORTH));
-              edges.put(EdgeRef.SOUTHEAST, lt.edges.get(EdgeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTH, lt.nodes().get(NodeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTHEAST, lt.nodes().get(NodeRef.NORTH));
+              edges.put(EdgeRef.SOUTHEAST, lt.edges().get(EdgeRef.NORTHWEST));
             }
             case SOUTHWEST -> {
-              nodes.put(NodeRef.SOUTH, lt.nodes.get(NodeRef.NORTHEAST));
-              nodes.put(NodeRef.SOUTHWEST, lt.nodes.get(NodeRef.NORTH));
-              edges.put(EdgeRef.SOUTHWEST, lt.edges.get(EdgeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTH, lt.nodes().get(NodeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTHWEST, lt.nodes().get(NodeRef.NORTH));
+              edges.put(EdgeRef.SOUTHWEST, lt.edges().get(EdgeRef.NORTHEAST));
             }
             case WEST -> {
-              nodes.put(NodeRef.NORTHWEST, lt.nodes.get(NodeRef.NORTHEAST));
-              nodes.put(NodeRef.SOUTHWEST, lt.nodes.get(NodeRef.SOUTHEAST));
-              edges.put(EdgeRef.WEST, lt.edges.get(EdgeRef.EAST));
+              nodes.put(NodeRef.NORTHWEST, lt.nodes().get(NodeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTHWEST, lt.nodes().get(NodeRef.SOUTHEAST));
+              edges.put(EdgeRef.WEST, lt.edges().get(EdgeRef.EAST));
             }
             case NORTHWEST -> {
-              nodes.put(NodeRef.NORTH, lt.nodes.get(NodeRef.SOUTHEAST));
-              nodes.put(NodeRef.NORTHWEST, lt.nodes.get(NodeRef.SOUTH));
-              edges.put(EdgeRef.NORTHWEST, lt.edges.get(EdgeRef.SOUTHEAST));
+              nodes.put(NodeRef.NORTH, lt.nodes().get(NodeRef.SOUTHEAST));
+              nodes.put(NodeRef.NORTHWEST, lt.nodes().get(NodeRef.SOUTH));
+              edges.put(EdgeRef.NORTHWEST, lt.edges().get(EdgeRef.SOUTHEAST));
             }
             case NORTHEAST -> {
-              nodes.put(NodeRef.NORTH, lt.nodes.get(NodeRef.SOUTHWEST));
-              nodes.put(NodeRef.NORTHEAST, lt.nodes.get(NodeRef.SOUTH));
-              edges.put(EdgeRef.NORTHEAST, lt.edges.get(EdgeRef.SOUTHWEST));
+              nodes.put(NodeRef.NORTH, lt.nodes().get(NodeRef.SOUTHWEST));
+              nodes.put(NodeRef.NORTHEAST, lt.nodes().get(NodeRef.SOUTH));
+              edges.put(EdgeRef.NORTHEAST, lt.edges().get(EdgeRef.SOUTHWEST));
             }
           }
         }
@@ -160,8 +164,8 @@ public class CatanMap {
   private void rebuildCaches() {
     // land nodes
     for (LandTile lt : landTiles.values()) {
-      landNodes.addAll(lt.nodes.values());
-      for (Edge e : lt.edges.values()) {
+      landNodes.addAll(lt.nodes().values());
+      for (Edge e : lt.edges().values()) {
         int a = Math.min(e.a(), e.b());
         int b = Math.max(e.a(), e.b());
         long key = (((long) a) << 32) | (b & 0xffffffffL);
@@ -169,13 +173,13 @@ public class CatanMap {
         nodeNeighbors.computeIfAbsent(a, k -> new HashSet<>()).add(b);
         nodeNeighbors.computeIfAbsent(b, k -> new HashSet<>()).add(a);
       }
-      tileNumberById.put(lt.id, lt.number);
-      tileResourceById.put(lt.id, lt.resource);
-      tileNodesById.put(lt.id, new HashSet<>(lt.nodes.values()));
+      tileNumberById.put(lt.id(), lt.number());
+      tileResourceById.put(lt.id(), lt.resource());
+      tileNodesById.put(lt.id(), new HashSet<>(lt.nodes().values()));
     }
     // adjacent tiles by node
     for (LandTile lt : landTiles.values()) {
-      for (Integer nodeId : lt.nodes.values()) {
+      for (Integer nodeId : lt.nodes().values()) {
         adjacentTiles.computeIfAbsent(nodeId, k -> new ArrayList<>()).add(lt);
       }
     }
