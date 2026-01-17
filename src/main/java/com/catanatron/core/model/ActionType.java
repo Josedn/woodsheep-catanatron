@@ -1,0 +1,23 @@
+package com.catanatron.core.model;
+
+public enum ActionType {
+    ROLL,
+    MOVE_ROBBER,
+    DISCARD,
+    BUILD_ROAD,
+    BUILD_SETTLEMENT,
+    BUILD_CITY,
+    BUY_DEVELOPMENT_CARD,
+    PLAY_KNIGHT_CARD,
+    PLAY_YEAR_OF_PLENTY,
+    PLAY_MONOPOLY,
+    PLAY_ROAD_BUILDING,
+    MARITIME_TRADE,
+    OFFER_TRADE,
+    ACCEPT_TRADE,
+    REJECT_TRADE,
+    CONFIRM_TRADE,
+    CANCEL_TRADE,
+    END_TURN
+}
+
