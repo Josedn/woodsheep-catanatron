@@ -18,7 +18,9 @@ public class Demo {
               + game.state.currentColor()
               + " prompt="
               + game.state.currentPrompt
-              + " actions="
+              + " actions("
+              + game.playableActions.size()
+              + ")="
               + game.playableActions);
       game.playTick();
     }

@@ -21,67 +21,73 @@ public class CatanMap {
   public final Map<Integer, Set<Integer>> tileNodesById = new HashMap<>();
 
   public static CatanMap base() {
-    MapTemplate tpl = BaseTemplate.build();
-    return fromTemplate(tpl);
+    return fromTemplate(MapTemplate.buildBaseTemplate());
   }
 
-  public static CatanMap fromTemplate(MapTemplate tpl) {
+  private static CatanMap fromTemplate(MapTemplate mapTemplate) {
     CatanMap m = new CatanMap();
-    buildTiles(m, tpl);
+    buildTiles(m, mapTemplate);
     m.rebuildCaches();
     return m;
   }
 
-  private static void buildTiles(CatanMap m, MapTemplate tpl) {
+  private static void buildTiles(CatanMap catanMap, MapTemplate mapTemplate) {
     int nodeAutoinc = 0;
     int landIndex = 0;
     int idAutoinc = 0;
     // Maintain insertion order for deterministic ids
-    for (Map.Entry<Coordinate, Object> e : tpl.topology().entrySet()) {
-      Coordinate c = e.getKey();
-      Object kind = e.getValue();
+    for (Map.Entry<Coordinate, Object> entry : mapTemplate.topology().entrySet()) {
+      Coordinate coordinate = entry.getKey();
+      Object kind = entry.getValue();
       // Initialize node/edge maps for this tile
       EnumMap<NodeRef, Integer> nodes = new EnumMap<>(NodeRef.class);
       EnumMap<EdgeRef, Edge> edges = new EnumMap<>(EdgeRef.class);
-      for (NodeRef nr : NodeRef.values()) nodes.put(nr, null);
-      for (EdgeRef er : EdgeRef.values()) edges.put(er, null);
+
+      for (NodeRef nodeRef : NodeRef.values()) {
+        nodes.put(nodeRef, null);
+      }
+      for (EdgeRef edgeRef : EdgeRef.values()) {
+        edges.put(edgeRef, null);
+      }
 
       // Share with neighbors if present
-      for (Direction d : Direction.values()) {
-        Coordinate nc = add(c, d);
-        Tile neighbor = m.tiles.get(nc);
-        if (neighbor == null) continue;
-        if (neighbor instanceof LandTile lt) {
-          switch (d) {
+      for (Direction direction : Direction.values()) {
+        Coordinate nodeCoordinate = add(coordinate, direction);
+        Tile neighbor = catanMap.tiles.get(nodeCoordinate);
+        if (neighbor == null) {
+          continue;
+        }
+        if (neighbor instanceof LandTile neighborTile) {
+          switch (direction) {
             case EAST -> {
-              nodes.put(NodeRef.NORTHEAST, lt.nodes().get(NodeRef.NORTHWEST));
-              nodes.put(NodeRef.SOUTHEAST, lt.nodes().get(NodeRef.SOUTHWEST));
-              edges.put(EdgeRef.EAST, lt.edges().get(EdgeRef.WEST));
+              nodes.put(NodeRef.NORTHEAST, neighborTile.nodes().get(NodeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTHEAST, neighborTile.nodes().get(NodeRef.SOUTHWEST));
+              edges.put(EdgeRef.EAST, neighborTile.edges().get(EdgeRef.WEST));
             }
             case SOUTHEAST -> {
-              nodes.put(NodeRef.SOUTH, lt.nodes().get(NodeRef.NORTHWEST));
-              nodes.put(NodeRef.SOUTHEAST, lt.nodes().get(NodeRef.NORTH));
-              edges.put(EdgeRef.SOUTHEAST, lt.edges().get(EdgeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTH, neighborTile.nodes().get(NodeRef.NORTHWEST));
+              nodes.put(NodeRef.SOUTHEAST, neighborTile.nodes().get(NodeRef.NORTH));
+              edges.put(EdgeRef.SOUTHEAST, neighborTile.edges().get(EdgeRef.NORTHWEST));
             }
             case SOUTHWEST -> {
-              nodes.put(NodeRef.SOUTH, lt.nodes().get(NodeRef.NORTHEAST));
-              nodes.put(NodeRef.SOUTHWEST, lt.nodes().get(NodeRef.NORTH));
-              edges.put(EdgeRef.SOUTHWEST, lt.edges().get(EdgeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTH, neighborTile.nodes().get(NodeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTHWEST, neighborTile.nodes().get(NodeRef.NORTH));
+              edges.put(EdgeRef.SOUTHWEST, neighborTile.edges().get(EdgeRef.NORTHEAST));
             }
             case WEST -> {
-              nodes.put(NodeRef.NORTHWEST, lt.nodes().get(NodeRef.NORTHEAST));
-              nodes.put(NodeRef.SOUTHWEST, lt.nodes().get(NodeRef.SOUTHEAST));
-              edges.put(EdgeRef.WEST, lt.edges().get(EdgeRef.EAST));
+              nodes.put(NodeRef.NORTHWEST, neighborTile.nodes().get(NodeRef.NORTHEAST));
+              nodes.put(NodeRef.SOUTHWEST, neighborTile.nodes().get(NodeRef.SOUTHEAST));
+              edges.put(EdgeRef.WEST, neighborTile.edges().get(EdgeRef.EAST));
             }
             case NORTHWEST -> {
-              nodes.put(NodeRef.NORTH, lt.nodes().get(NodeRef.SOUTHEAST));
-              nodes.put(NodeRef.NORTHWEST, lt.nodes().get(NodeRef.SOUTH));
-              edges.put(EdgeRef.NORTHWEST, lt.edges().get(EdgeRef.SOUTHEAST));
+              nodes.put(NodeRef.NORTH, neighborTile.nodes().get(NodeRef.SOUTHEAST));
+              nodes.put(NodeRef.NORTHWEST, neighborTile.nodes().get(NodeRef.SOUTH));
+              edges.put(EdgeRef.NORTHWEST, neighborTile.edges().get(EdgeRef.SOUTHEAST));
             }
             case NORTHEAST -> {
-              nodes.put(NodeRef.NORTH, lt.nodes().get(NodeRef.SOUTHWEST));
-              nodes.put(NodeRef.NORTHEAST, lt.nodes().get(NodeRef.SOUTH));
-              edges.put(EdgeRef.NORTHEAST, lt.edges().get(EdgeRef.SOUTHWEST));
+              nodes.put(NodeRef.NORTH, neighborTile.nodes().get(NodeRef.SOUTHWEST));
+              nodes.put(NodeRef.NORTHEAST, neighborTile.nodes().get(NodeRef.SOUTH));
+              edges.put(EdgeRef.NORTHEAST, neighborTile.edges().get(EdgeRef.SOUTHWEST));
             }
           }
         }
@@ -101,30 +107,36 @@ public class CatanMap {
         }
       }
 
-      Tile t;
+      // create and save tile
+      Tile tile;
       if (kind == LandTile.class) {
         // assign resource/number in order, desert gets null/none
-        Resource res = tpl.tileResources().get(landIndex);
-        Integer num =
-            (res == null
+        Resource resource = mapTemplate.tileResources().get(landIndex);
+        Integer number =
+            (resource == null
                 ? null
-                : tpl.numbers()
-                    .get(landIndex - countDesertsBefore(tpl.tileResources(), landIndex)));
-        t = new LandTile(idAutoinc, res, num, nodes, edges);
-        m.landTiles.put(c, (LandTile) t);
-        m.tilesById.put(idAutoinc, (LandTile) t);
+                : mapTemplate
+                    .numbers()
+                    .get(landIndex - countDesertsBefore(mapTemplate.tileResources(), landIndex)));
+        tile = new LandTile(idAutoinc, resource, number, nodes, edges);
+        catanMap.landTiles.put(coordinate, (LandTile) tile);
+        catanMap.tilesById.put(idAutoinc, (LandTile) tile);
         landIndex++;
       } else {
-        t = new Water(nodes, edges);
+        tile = new Water(nodes, edges);
       }
-      m.tiles.put(c, t);
+      catanMap.tiles.put(coordinate, tile);
       idAutoinc++;
     }
   }
 
   private static int countDesertsBefore(List<Resource> tileResources, int idx) {
     int count = 0;
-    for (int i = 0; i < idx; i++) if (tileResources.get(i) == null) count++;
+    for (int i = 0; i < idx; i++) {
+      if (tileResources.get(i) == null) {
+        count++;
+      }
+    }
     return count;
   }
 
@@ -182,70 +194,6 @@ public class CatanMap {
       for (Integer nodeId : lt.nodes().values()) {
         adjacentTiles.computeIfAbsent(nodeId, k -> new ArrayList<>()).add(lt);
       }
-    }
-  }
-
-  // ===== BASE template definition
-  static class BaseTemplate {
-    static MapTemplate build() {
-      List<Integer> numbers =
-          Arrays.asList(2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12);
-      List<Resource> ports =
-          Arrays.asList(
-              Resource.WOOD,
-              Resource.BRICK,
-              Resource.SHEEP,
-              Resource.WHEAT,
-              Resource.ORE,
-              null,
-              null,
-              null,
-              null);
-      List<Resource> tiles =
-          Arrays.asList(
-              Resource.WOOD,
-              Resource.WOOD,
-              Resource.WOOD,
-              Resource.WOOD,
-              Resource.BRICK,
-              Resource.BRICK,
-              Resource.BRICK,
-              Resource.SHEEP,
-              Resource.SHEEP,
-              Resource.SHEEP,
-              Resource.SHEEP,
-              Resource.WHEAT,
-              Resource.WHEAT,
-              Resource.WHEAT,
-              Resource.WHEAT,
-              Resource.ORE,
-              Resource.ORE,
-              Resource.ORE,
-              null);
-      Map<Coordinate, Object> topology = new LinkedHashMap<>();
-      // center
-      topology.put(new Coordinate(0, 0, 0), LandTile.class);
-      // first ring
-      topology.put(new Coordinate(1, -1, 0), LandTile.class);
-      topology.put(new Coordinate(0, -1, 1), LandTile.class);
-      topology.put(new Coordinate(-1, 0, 1), LandTile.class);
-      topology.put(new Coordinate(-1, 1, 0), LandTile.class);
-      topology.put(new Coordinate(0, 1, -1), LandTile.class);
-      topology.put(new Coordinate(1, 0, -1), LandTile.class);
-      // second ring
-      topology.put(new Coordinate(2, -2, 0), LandTile.class);
-      topology.put(new Coordinate(1, -2, 1), LandTile.class);
-      topology.put(new Coordinate(0, -2, 2), LandTile.class);
-      topology.put(new Coordinate(-1, -1, 2), LandTile.class);
-      topology.put(new Coordinate(-2, 0, 2), LandTile.class);
-      topology.put(new Coordinate(-2, 1, 1), LandTile.class);
-      topology.put(new Coordinate(-2, 2, 0), LandTile.class);
-      topology.put(new Coordinate(-1, 2, -1), LandTile.class);
-      topology.put(new Coordinate(0, 2, -2), LandTile.class);
-      topology.put(new Coordinate(1, 1, -2), LandTile.class);
-      topology.put(new Coordinate(2, 0, -2), LandTile.class);
-      topology.put(new Coordinate(2, -1, -1), LandTile.class);
-      return new MapTemplate(numbers, ports, tiles, topology);
     }
   }
 
