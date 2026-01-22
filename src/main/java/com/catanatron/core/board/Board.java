@@ -18,7 +18,7 @@ public class Board {
     this.map = map;
   }
 
-  public Set<Integer> buildableNodeIds(PlayerColor color, boolean initialPhase) {
+  public Set<Integer> buildableNodeIds(PlayerColor playerColor, boolean initialPhase) {
     if (initialPhase) {
       // any unblocked, empty land node
       Set<Integer> out = new HashSet<>(map.landNodes);
@@ -31,44 +31,49 @@ public class Board {
     for (Integer nodeId : map.landNodes) {
       if (blockedNodes.contains(nodeId) || buildings.containsKey(nodeId)) continue;
       // must touch at least one of our roads
-      boolean touchesOurRoad = false;
+      boolean touchesOwnedRoad = false;
       for (Integer neighbor : map.nodeNeighbors.getOrDefault(nodeId, Set.of())) {
-        if (roads.getOrDefault(edgeKey(nodeId, neighbor), null) == color) {
-          touchesOurRoad = true;
+        if (roads.getOrDefault(edgeKey(nodeId, neighbor), null) == playerColor) {
+          touchesOwnedRoad = true;
           break;
         }
       }
-      if (touchesOurRoad) candidates.add(nodeId);
+      if (touchesOwnedRoad) candidates.add(nodeId);
     }
     return candidates;
   }
 
-  public List<com.catanatron.core.model.Edge> buildableEdges(PlayerColor color) {
+  public List<com.catanatron.core.model.Edge> buildableEdges(PlayerColor playerColor) {
     List<com.catanatron.core.model.Edge> edges = new ArrayList<>();
     // Only edges adjacent to owned nodes OR extend from existing own roads
-    Set<Integer> owned = ownedNodes(color);
+    Set<Integer> ownedNodes = ownedNodes(playerColor);
     // Edges from owned nodes
-    for (Integer a : owned) {
-      for (Integer b : map.nodeNeighbors.getOrDefault(a, Set.of())) {
-        long key = edgeKey(a, b);
+    for (Integer nodeA : ownedNodes) {
+      for (Integer nodeB : map.nodeNeighbors.getOrDefault(nodeA, Set.of())) {
+        long key = edgeKey(nodeA, nodeB);
         if (!roads.containsKey(key))
-          edges.add(new com.catanatron.core.model.Edge(Math.min(a, b), Math.max(a, b)));
+          edges.add(
+              new com.catanatron.core.model.Edge(Math.min(nodeA, nodeB), Math.max(nodeA, nodeB)));
       }
     }
     // Edges extending owned roads (one endpoint shared)
-    for (Map.Entry<Long, PlayerColor> e : roads.entrySet()) {
-      if (e.getValue() != color) continue;
-      int a = (int) (e.getKey() >> 32);
-      int b = (int) (e.getKey().longValue());
-      for (Integer nb : map.nodeNeighbors.getOrDefault(a, Set.of())) {
-        long key = edgeKey(a, nb);
+    for (Map.Entry<Long, PlayerColor> roadEntry : roads.entrySet()) {
+      if (roadEntry.getValue() != playerColor) continue;
+      int nodeA = (int) (roadEntry.getKey() >> 32);
+      int nodeB = (int) (roadEntry.getKey().longValue());
+      for (Integer neighborOfA : map.nodeNeighbors.getOrDefault(nodeA, Set.of())) {
+        long key = edgeKey(nodeA, neighborOfA);
         if (!roads.containsKey(key))
-          edges.add(new com.catanatron.core.model.Edge(Math.min(a, nb), Math.max(a, nb)));
+          edges.add(
+              new com.catanatron.core.model.Edge(
+                  Math.min(nodeA, neighborOfA), Math.max(nodeA, neighborOfA)));
       }
-      for (Integer nb : map.nodeNeighbors.getOrDefault(b, Set.of())) {
-        long key = edgeKey(b, nb);
+      for (Integer neighborOfB : map.nodeNeighbors.getOrDefault(nodeB, Set.of())) {
+        long key = edgeKey(nodeB, neighborOfB);
         if (!roads.containsKey(key))
-          edges.add(new com.catanatron.core.model.Edge(Math.min(b, nb), Math.max(b, nb)));
+          edges.add(
+              new com.catanatron.core.model.Edge(
+                  Math.min(nodeB, neighborOfB), Math.max(nodeB, neighborOfB)));
       }
     }
     return edges;
@@ -90,8 +95,8 @@ public class Board {
     buildings.put(nodeId, Map.entry(color, BuildingType.CITY));
   }
 
-  public void buildRoad(PlayerColor color, int a, int b) {
-    long key = edgeKey(a, b);
+  public void buildRoad(PlayerColor color, int nodeA, int nodeB) {
+    long key = edgeKey(nodeA, nodeB);
     if (roads.containsKey(key)) throw new IllegalArgumentException("road exists");
     roads.put(key, color);
   }
@@ -101,11 +106,12 @@ public class Board {
   }
 
   private Set<Integer> ownedNodes(PlayerColor color) {
-    Set<Integer> owned = new HashSet<>();
-    for (Map.Entry<Integer, Map.Entry<PlayerColor, BuildingType>> e : buildings.entrySet()) {
-      if (e.getValue().getKey() == color) owned.add(e.getKey());
+    Set<Integer> nodesOwned = new HashSet<>();
+    for (Map.Entry<Integer, Map.Entry<PlayerColor, BuildingType>> buildingEntry :
+        buildings.entrySet()) {
+      if (buildingEntry.getValue().getKey() == color) nodesOwned.add(buildingEntry.getKey());
     }
-    return owned;
+    return nodesOwned;
   }
 
   public Set<Integer> ownedSettlementNodes(PlayerColor color) {
@@ -117,9 +123,9 @@ public class Board {
     return owned;
   }
 
-  private static long edgeKey(int a, int b) {
-    int x = Math.min(a, b), y = Math.max(a, b);
-    return (((long) x) << 32) | (y & 0xffffffffL);
+  private static long edgeKey(int nodeA, int nodeB) {
+    int min = Math.min(nodeA, nodeB), max = Math.max(nodeA, nodeB);
+    return (((long) min) << 32) | (max & 0xffffffffL);
   }
 
   private boolean isEnemyNode(int nodeId, PlayerColor color) {

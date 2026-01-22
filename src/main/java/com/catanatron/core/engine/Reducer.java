@@ -30,21 +30,21 @@ public final class Reducer {
     // Clean per-turn flags
     set(s, s.currentColor(), "_HAS_ROLLED", 0);
     // Reset dev-card per-turn flag and set owned-at-start markers for next turn
-    int idx = s.currentPlayerIndex;
-    s.playerState.put("P" + idx + "_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN", 0);
+    int playerIndex = s.currentPlayerIndex;
+    s.playerState.put("P" + playerIndex + "_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN", 0);
     // Owned-at-start means playable next turn if in hand
     for (var card :
         new DevCard[] {
           DevCard.KNIGHT, DevCard.YEAR_OF_PLENTY, DevCard.ROAD_BUILDING, DevCard.MONOPOLY
         }) {
-      String base = "P" + idx + "_" + card.name();
+      String base = "P" + playerIndex + "_" + card.name();
       boolean inHand = s.playerState.get(base + "_IN_HAND") > 0;
       s.playerState.put(base + "_OWNED_AT_START", inHand ? 1 : 0);
     }
     // Advance
-    int next = (s.currentPlayerIndex + 1) % s.colors.size();
-    s.currentPlayerIndex = next;
-    s.currentTurnIndex = next;
+    int nextPlayerIndex = (s.currentPlayerIndex + 1) % s.colors.size();
+    s.currentPlayerIndex = nextPlayerIndex;
+    s.currentTurnIndex = nextPlayerIndex;
     s.numTurns += 1;
     s.currentPrompt = ActionPrompt.PLAY_TURN;
     return new ActionRecord<>(a, null);
@@ -68,13 +68,13 @@ public final class Reducer {
         "P" + s.currentPlayerIndex + "_ORE_IN_HAND",
         s.playerState.get("P" + s.currentPlayerIndex + "_ORE_IN_HAND") - 1);
 
-    var card = s.developmentDeck.remove(s.developmentDeck.size() - 1);
-    String base = "P" + s.currentPlayerIndex + "_" + card.name() + "_IN_HAND";
-    s.playerState.put(base, s.playerState.get(base) + 1);
-    if (card == DevCard.VICTORY_POINT) {
+    var drawnCard = s.developmentDeck.remove(s.developmentDeck.size() - 1);
+    String inHandKey = "P" + s.currentPlayerIndex + "_" + drawnCard.name() + "_IN_HAND";
+    s.playerState.put(inHandKey, s.playerState.get(inHandKey) + 1);
+    if (drawnCard == DevCard.VICTORY_POINT) {
       addByIndex(s, s.currentPlayerIndex, "_ACTUAL_VICTORY_POINTS", +1);
     }
-    return new ActionRecord<>(new Action<>(a.color, a.type, card), card);
+    return new ActionRecord<>(new Action<>(a.color, a.type, drawnCard), drawnCard);
   }
 
   private static ActionRecord<?> playYearOfPlenty(State s, Action<?> a) {
@@ -97,11 +97,12 @@ public final class Reducer {
   private static ActionRecord<?> playKnight(State s, Action<?> a) {
     // Set prompt to move robber; increase played knight count; handle largest army later
     s.currentPrompt = ActionPrompt.MOVE_ROBBER;
-    int idx = s.colors.indexOf(a.color);
+    int playerIndex = s.colors.indexOf(a.color);
     s.playerState.put(
-        "P" + idx + "_PLAYED_KNIGHT", s.playerState.get("P" + idx + "_PLAYED_KNIGHT") + 1);
+        "P" + playerIndex + "_PLAYED_KNIGHT",
+        s.playerState.get("P" + playerIndex + "_PLAYED_KNIGHT") + 1);
     markDevPlayed(s, a.color, DevCard.KNIGHT);
-    maintainLargestArmy(s, idx);
+    maintainLargestArmy(s, playerIndex);
     return new ActionRecord<>(a, null);
   }
 
@@ -384,43 +385,43 @@ public final class Reducer {
   }
 
   private static void maintainLongestRoad(State s) {
-    int bestLen = 0;
-    int bestIdx = -1;
+    int bestLength = 0;
+    int bestPlayerIndex = -1;
     for (int i = 0; i < s.colors.size(); i++) {
-      var c = s.colors.get(i);
-      int len = s.board.longestRoadLength(c);
-      s.playerState.put("P" + i + "_LONGEST_ROAD_LENGTH", len);
-      if (len > bestLen) {
-        bestLen = len;
-        bestIdx = i;
+      var color = s.colors.get(i);
+      int length = s.board.longestRoadLength(color);
+      s.playerState.put("P" + i + "_LONGEST_ROAD_LENGTH", length);
+      if (length > bestLength) {
+        bestLength = length;
+        bestPlayerIndex = i;
       }
     }
     // Find previous holder
-    int prevIdx = -1;
+    int previousHolderIndex = -1;
     for (int i = 0; i < s.colors.size(); i++) {
       if (s.playerState.get("P" + i + "_HAS_ROAD") == 1) {
-        prevIdx = i;
+        previousHolderIndex = i;
         break;
       }
     }
     // Clear flags
     for (int i = 0; i < s.colors.size(); i++) s.playerState.put("P" + i + "_HAS_ROAD", 0);
 
-    if (bestLen >= 5 && bestIdx >= 0) {
-      s.playerState.put("P" + bestIdx + "_HAS_ROAD", 1);
-      if (prevIdx != bestIdx) {
-        if (prevIdx >= 0) {
-          addByIndex(s, prevIdx, "_VICTORY_POINTS", -2);
-          addByIndex(s, prevIdx, "_ACTUAL_VICTORY_POINTS", -2);
+    if (bestLength >= 5 && bestPlayerIndex >= 0) {
+      s.playerState.put("P" + bestPlayerIndex + "_HAS_ROAD", 1);
+      if (previousHolderIndex != bestPlayerIndex) {
+        if (previousHolderIndex >= 0) {
+          addByIndex(s, previousHolderIndex, "_VICTORY_POINTS", -2);
+          addByIndex(s, previousHolderIndex, "_ACTUAL_VICTORY_POINTS", -2);
         }
-        addByIndex(s, bestIdx, "_VICTORY_POINTS", +2);
-        addByIndex(s, bestIdx, "_ACTUAL_VICTORY_POINTS", +2);
+        addByIndex(s, bestPlayerIndex, "_VICTORY_POINTS", +2);
+        addByIndex(s, bestPlayerIndex, "_ACTUAL_VICTORY_POINTS", +2);
       }
     } else {
       // No valid longest road; revoke from previous holder if any
-      if (prevIdx >= 0) {
-        addByIndex(s, prevIdx, "_VICTORY_POINTS", -2);
-        addByIndex(s, prevIdx, "_ACTUAL_VICTORY_POINTS", -2);
+      if (previousHolderIndex >= 0) {
+        addByIndex(s, previousHolderIndex, "_VICTORY_POINTS", -2);
+        addByIndex(s, previousHolderIndex, "_ACTUAL_VICTORY_POINTS", -2);
       }
     }
   }
@@ -430,51 +431,52 @@ public final class Reducer {
     s.playerState.put(key, s.playerState.get(key) + delta);
   }
 
-  private static void advance(State s, int dir) {
-    int next = (s.currentPlayerIndex + dir + s.colors.size()) % s.colors.size();
+  private static void advance(State s, int step) {
+    int next = (s.currentPlayerIndex + step + s.colors.size()) % s.colors.size();
     s.currentPlayerIndex = next;
     s.currentTurnIndex = next;
     s.numTurns += 1;
   }
 
   private static void set(State s, PlayerColor c, String suffix, int v) {
-    int idx = s.colors.indexOf(c);
-    s.playerState.put("P" + idx + suffix, v);
+    int playerIndex = s.colors.indexOf(c);
+    s.playerState.put("P" + playerIndex + suffix, v);
   }
 
   private static void add(State s, PlayerColor c, String suffix, int delta) {
-    int idx = s.colors.indexOf(c);
-    String key = "P" + idx + suffix;
+    int playerIndex = s.colors.indexOf(c);
+    String key = "P" + playerIndex + suffix;
     s.playerState.put(key, s.playerState.get(key) + delta);
   }
 
   private static void addResource(
       State s, PlayerColor c, com.catanatron.core.model.Resource r, int amount) {
-    int idx = s.colors.indexOf(c);
-    String key = "P" + idx + "_" + r.name() + "_IN_HAND";
+    int playerIndex = s.colors.indexOf(c);
+    String key = "P" + playerIndex + "_" + r.name() + "_IN_HAND";
     s.playerState.put(key, s.playerState.get(key) + amount);
     // Bank accounting omitted for now
   }
 
   private static int numResources(State s, PlayerColor c) {
-    int idx = s.colors.indexOf(c);
-    int w = s.playerState.get("P" + idx + "_WOOD_IN_HAND");
-    int b = s.playerState.get("P" + idx + "_BRICK_IN_HAND");
-    int sh = s.playerState.get("P" + idx + "_SHEEP_IN_HAND");
-    int wh = s.playerState.get("P" + idx + "_WHEAT_IN_HAND");
-    int o = s.playerState.get("P" + idx + "_ORE_IN_HAND");
-    return w + b + sh + wh + o;
+    int playerIndex = s.colors.indexOf(c);
+    int wood = s.playerState.get("P" + playerIndex + "_WOOD_IN_HAND");
+    int brick = s.playerState.get("P" + playerIndex + "_BRICK_IN_HAND");
+    int sheep = s.playerState.get("P" + playerIndex + "_SHEEP_IN_HAND");
+    int wheat = s.playerState.get("P" + playerIndex + "_WHEAT_IN_HAND");
+    int ore = s.playerState.get("P" + playerIndex + "_ORE_IN_HAND");
+    return wood + brick + sheep + wheat + ore;
   }
 
   private static boolean isEdgeBuildable(
       State s, PlayerColor color, com.catanatron.core.model.Edge edge) {
-    long key =
+    long requestedKey =
         (((long) Math.min(edge.a(), edge.b())) << 32)
             | (((int) Math.max(edge.a(), edge.b())) & 0xffffffffL);
-    for (var e : s.board.buildableEdges(color)) {
-      long k2 =
-          (((long) Math.min(e.a(), e.b())) << 32) | (((int) Math.max(e.a(), e.b())) & 0xffffffffL);
-      if (k2 == key) return true;
+    for (var allowedEdge : s.board.buildableEdges(color)) {
+      long allowedKey =
+          (((long) Math.min(allowedEdge.a(), allowedEdge.b())) << 32)
+              | (((int) Math.max(allowedEdge.a(), allowedEdge.b())) & 0xffffffffL);
+      if (allowedKey == requestedKey) return true;
     }
     return false;
   }
